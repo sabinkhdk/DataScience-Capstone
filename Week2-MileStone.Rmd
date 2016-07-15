@@ -1,0 +1,207 @@
+---
+title: "Capstone Project for Data Science Specialization Coursera"
+author: "Sabin Khadka"
+date: "March 10, 2016"
+output: html_document
+---
+
+## Week 2 milestone report
+
+### Executive summary
+
+The report is a part of [Data Science Specialization](https://www.coursera.org/specializations/jhu-data-science) capstone project. The purpose of this report is to do the exploration of data set provided. The dataset provided for the current project was provided here in the [link](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip).  
+
+Downloading the dataset for the project.
+
+```{r chunk1, echo=TRUE}
+dirpath <- "/Users/sabinkhadka/Github/DataScience-Capstone/"
+setwd(dirpath)
+#download file from URL
+fileurl <- "https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip"
+if (!file.exists(file.path(dirpath,"Data.zip"))) {
+        download.file(fileurl, dest="Data.zip", method="curl", 
+                      quiet = FALSE, mode = "wb", cacheOK = TRUE)
+}
+if (!file.exists(file.path(dirpath,"final"))){
+        unzip("Data.zip", files = NULL, list = FALSE, overwrite = TRUE,
+              junkpaths = FALSE, exdir = ".", unzip = "internal")
+}
+```
+
+In this project, we will only use the english language. The files we'd be using are:
+
+1. `r dir(paste0(dirpath,"/final/en_US"))[1]` :  `r round(file.info(paste0(dirpath, "final/en_US/",dir(paste0(dirpath,"/final/en_US"))[1]))$size/1024^2)` MB
+
+2. `r dir(paste0(dirpath,"/final/en_US"))[2]` : `r round(file.info(paste0(dirpath, "final/en_US/",dir(paste0(dirpath,"/final/en_US"))[2]))$size/1024^2)` MB
+
+3. `r dir(paste0(dirpath,"/final/en_US"))[3]` : `r round(file.info(paste0(dirpath, "final/en_US/",dir(paste0(dirpath,"/final/en_US"))[3]))$size/1024^2)` MB
+
+=============================================================================
+
+```{r chunk2, echo=TRUE, warning=FALSE, message=FALSE}
+library("tm")
+library("ggplot2")
+library("xtable")
+library("RWeka")
+library("wordcloud")
+blog <- paste0(dirpath, "final/en_US/",dir(paste0(dirpath,"/final/en_US"))[1])
+blog_ <- readLines(blog)
+len_blog <- length(blog_)
+news <- paste0(dirpath, "final/en_US/",dir(paste0(dirpath,"/final/en_US"))[2])
+news_ <- readLines(news)
+len_news <- length(news_)
+twit <- paste0(dirpath, "final/en_US/",dir(paste0(dirpath,"/final/en_US"))[3])
+twit_ <- readLines(twit)
+len_twit <- length(twit_)
+info <- as.data.frame(matrix(data = NA, nrow=3, ncol=3))
+colnames(info) <- c("file name", "size (MB)", "#lines")
+info[1,1] <- dir(paste0(dirpath,"/final/en_US"))[1]
+info[1,2] <- round(file.info(paste0(dirpath, "final/en_US/",dir(paste0(dirpath,"/final/en_US"))[1]))$size/1024^2)
+info[2,1] <- dir(paste0(dirpath,"/final/en_US"))[2]
+info[2,2] <- round(file.info(paste0(dirpath, "final/en_US/",dir(paste0(dirpath,"/final/en_US"))[2]))$size/1024^2)
+info[3,1] <- dir(paste0(dirpath,"/final/en_US"))[3]
+info[3,2] <- round(file.info(paste0(dirpath, "final/en_US/",dir(paste0(dirpath,"/final/en_US"))[3]))$size/1024^2)
+info[1,3] <- len_blog
+info[2,3] <- len_news
+info[3,3] <- len_twit
+```
+
+```{r xtable1, results='asis'}
+library(xtable)
+tab <- xtable(info)
+print(tab, type="html", align="c")
+```
+
+The size of the files are very large. For the purpose of exploration we'll only use subset (10%) of each of the files. The steps we follow here are adapted from various sources listed at the bottom of this report.
+
+
+```{r chunk3, echo=TRUE}
+set.seed(0)
+blog__ <- blog_[as.logical(rbinom(length(blog_), 1, prob=0.05))]
+news__ <- news_[as.logical(rbinom(length(news_), 1, prob=0.05))]
+twit__ <- twit_[as.logical(rbinom(length(twit_), 1, prob=0.05))]
+merge_all <- c(blog__, news__, twit__, recursive=TRUE)
+dir.create(paste0(dirpath,"temp"))
+if (!file.exists(file.path(paste0(dirpath,"temp/temp_merge.txt")))) {
+        writeLines(merge_all, paste0(dirpath,"temp/temp_merge.txt"))
+        } else {
+                file.remove(file.path(paste0(dirpath,"temp/temp_merge.txt")))
+                writeLines(merge_all, paste0(dirpath,"temp/temp_merge.txt"))
+        }
+Sample_docs <- Corpus(DirSource(paste0(dirpath, "temp")))
+```
+
+For preprocessing of the subset of corpora we'll do the following:
+
+i. Strip whitespace.
+
+ii. Remove punctuations
+
+iii. Remove numbers
+
+iv. Remove common words in English. (the most frequent words used in english that can confound the analysis)
+
+v. convert all words to lower case
+
+
+
+```{r chunk4}
+Corp_sample <- Sample_docs
+Corp_sample <- tm_map(Corp_sample, stripWhitespace)
+Corp_sample <- tm_map(Corp_sample, removePunctuation)  
+Corp_sample <- tm_map(Corp_sample, removeNumbers)  
+Corp_sample <- tm_map(Corp_sample, removeWords, stopwords("english"))  
+Corp_sample <- tm_map(Corp_sample, content_transformer(tolower))  
+#subCorpus <- tm_map(subCorpus, PlainTextDocument) 
+#dtf <- DocumentTermMatrix(subCorpus)
+Token_1 <- function(x) {
+        NGramTokenizer(x, Weka_control(min = 1, max = 1))
+        }
+Token_2 <- function(x) {
+        NGramTokenizer(x, Weka_control(min = 2, max = 2))
+        }
+Token_3 <- function(x) {
+        NGramTokenizer(x, Weka_control(min = 3, max = 3))
+        }
+SampleDoc_unigram <- DocumentTermMatrix(Corp_sample, control = list(tokenize = Token_1))
+SampleDoc_bigram  <- DocumentTermMatrix(Corp_sample, control = list(tokenize = Token_2))
+SampleDoc_trigram <- DocumentTermMatrix(Corp_sample, control = list(tokenize = Token_3))
+Sample_unigram_freq <- sort(colSums(as.matrix(SampleDoc_unigram)), decreasing=TRUE)
+Sample_bigram_freq  <- sort(colSums(as.matrix(SampleDoc_bigram)), decreasing=TRUE)
+Sample_trigram_freq <- sort(colSums(as.matrix(SampleDoc_trigram)), decreasing=TRUE)
+Sample_unigramFreq <- data.frame(word=names(Sample_unigram_freq), freq=Sample_unigram_freq)
+Sample_bigramFreq <- data.frame(word=names(Sample_bigram_freq), freq=Sample_bigram_freq)
+Sample_trigramFreq <- data.frame(word=names(Sample_trigram_freq), freq=Sample_trigram_freq)
+```
+
+
+Figure below shows the top 25th frequent unigram words.
+
+```{r, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE}
+p0 <- ggplot(data= Sample_unigramFreq[c(1:25),],aes(word, freq)) + geom_bar(stat="identity", color="red", alpha=0.75)
+p0 <- p0 + labs(title ="Top 25 unigrams", x = "word", y="frequency") 
+p0 <- p0 +theme(axis.text.x=element_text(angle=45, hjust=1))
+plot(p0)
+```
+
+
+Word cloud of the top 100 unigram words
+
+```{r, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE}
+pal <- brewer.pal(6,"Dark2")
+wordcloud(names(Sample_unigram_freq), Sample_unigram_freq, max.words=100, random.order=FALSE, 
+          colors=pal, use.r.layout=TRUE)
+```
+
+
+Figure below shows the top 25th frequent bigram words.
+
+```{r, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE}
+p1 <- ggplot(data= Sample_bigramFreq[c(1:25),],aes(word, freq)) + geom_bar(stat="identity", color="red", fill="blue", alpha=0.75)
+p1 <- p1 + labs(title ="Top 25 bigrams", x = "words", y="frequency") 
+p1 <- p1 +theme(axis.text.x=element_text(angle=45, hjust=1))
+plot(p1)
+```
+
+
+Word cloud of the top 100 bigram words
+
+```{r, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE}
+wordcloud(names(Sample_bigram_freq), Sample_bigram_freq, max.words=100,
+          random.order=FALSE, colors=pal, use.r.layout=TRUE)
+```
+
+Figure below shows the top 25th frequent trigram words.
+
+```{r, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE}
+p2 <- ggplot(data= Sample_trigramFreq[c(1:25),],aes(word, freq)) + geom_bar(stat="identity", fill="red", alpha=0.75)
+p2 <- p2 + labs(title ="Top 25 trigrams", x = "words", y="frequency") 
+p2 <- p2 +theme(axis.text.x=element_text(angle=45, hjust=1))
+plot(p2)
+```
+
+
+Word cloud of the top 100 trigram words
+
+```{r, echo=FALSE, fig.align='center', fig.height=8, fig.width=8, message=FALSE}
+wordcloud(names(Sample_trigram_freq), Sample_bigram_freq, max.words=100,
+          random.order=FALSE, colors=pal, use.r.layout=TRUE)
+```
+
+
+### Summary
+
+Here we explore few techniques to clean the data. Also, tokenized the data in order to see the frequently used words and word combinations from en\_US.news.txt, en\_US.blogs.txt and en\_US.twitter.txt files using n-gram tokenizer function as employed in [tm](https://cran.r-project.org/web/packages/tm/index.html) package. The final goal of the project is to build the prediction model, that predicts the next word based on the already typed words and optimize the model in terms of efficiency and accuracy.
+
+This is work in progress report. Any feedback/constructive criticisms from the peers would be highly appreciated.
+
+#### Sources
+
+1. https://cran.r-project.org/web/packages/tm/tm.pdf
+
+2. http://www.rdatamining.com/examples/text-mining
+
+3. http://www.sthda.com/english/wiki/text-mining
+
+4. Also RWeka, wordcloud
+
