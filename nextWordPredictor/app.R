@@ -9,9 +9,10 @@ library("shiny")
 
 options(warn = -1)
 rm(list=ls())
-dirpath <- "/Users/sabinkhadka/Github/DataScience-Capstone/"
-setwd(dirpath)
-load(paste0(dirpath, "trn-data-20pcwithTweet/allGramsFreq_th2.RData"))
+#dirpath <- "/Users/sabinkhadka/Github/DataScience-Capstone/"
+#setwd(dirpath)
+#load(paste0(dirpath, "trn-data-20pcwithTweet/allGramsFreq_th2.RData"))
+load('allGramsFreq_th2.RData')
 predictfromTri <- function(input, u=uni, b=bi, t=tri) {
         input <- tolower(input)
         input <- gsub('[[:digit:]]+', '', input)
